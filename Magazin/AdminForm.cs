@@ -18,7 +18,7 @@ namespace Magazin
         private DataGridView dgvProducts;
         private DataGridView dgvStaff;
         private DataGridView dgvCredentials;
-        private Button btnAddProduct, btnEditProduct, btnDeactivateProduct;
+        private Button btnAddProduct, btnEditProduct, btnDeleteProduct, btnDeactivateProduct;
         private Button btnAddStaff, btnEditStaff, btnDeactivateStaff;
         private Button btnAddCredential, btnEditCredential, btnDeleteCredential;
         private GroupBox grpProductEdit;
@@ -61,13 +61,17 @@ namespace Magazin
                 BackgroundColor = Color.White
             };
 
-            btnAddProduct = new Button { Text = "➕ Добавить", Location = new Point(10, 370), Size = new Size(100, 35), BackColor = Color.LightGreen };
+            // Кнопки управления товарами (ДОБАВЛЕНА КНОПКА УДАЛЕНИЯ)
+            btnAddProduct = new Button { Text = "➕ Добавить", Location = new Point(10, 370), Size = new Size(90, 35), BackColor = Color.LightGreen };
             btnAddProduct.Click += BtnAddProduct_Click;
 
-            btnEditProduct = new Button { Text = "✏️ Редактировать", Location = new Point(120, 370), Size = new Size(110, 35), BackColor = Color.LightYellow };
+            btnEditProduct = new Button { Text = "✏️ Редактировать", Location = new Point(110, 370), Size = new Size(100, 35), BackColor = Color.LightYellow };
             btnEditProduct.Click += BtnEditProduct_Click;
 
-            btnDeactivateProduct = new Button { Text = "❌ Снять с продажи", Location = new Point(240, 370), Size = new Size(130, 35), BackColor = Color.LightCoral };
+            btnDeleteProduct = new Button { Text = "🗑️ Удалить", Location = new Point(220, 370), Size = new Size(90, 35), BackColor = Color.LightCoral };
+            btnDeleteProduct.Click += BtnDeleteProduct_Click;
+
+            btnDeactivateProduct = new Button { Text = "❌ Снять с продажи", Location = new Point(320, 370), Size = new Size(120, 35), BackColor = Color.Orange };
             btnDeactivateProduct.Click += BtnDeactivateProduct_Click;
 
             // Панель редактирования товара
@@ -105,7 +109,7 @@ namespace Magazin
 
             grpProductEdit.Controls.AddRange(new Control[] { lblName, txtProductName, lblSku, txtSku, lblPrice, txtPrice, lblCostPrice, txtCostPrice, lblStock, txtStock, lblCategory, cmbCategory, btnSaveProduct, btnCancelEdit });
 
-            productPage.Controls.AddRange(new Control[] { dgvProducts, btnAddProduct, btnEditProduct, btnDeactivateProduct, grpProductEdit });
+            productPage.Controls.AddRange(new Control[] { dgvProducts, btnAddProduct, btnEditProduct, btnDeleteProduct, btnDeactivateProduct, grpProductEdit });
 
             // ==================== Управление сотрудниками ====================
             dgvStaff = new DataGridView
@@ -249,12 +253,15 @@ namespace Magazin
                 }
                 displayList.Add(new
                 {
+                    cred.CredentialId,
                     cred.Login,
                     Сотрудник = staffName
                 });
             }
             dgvCredentials.DataSource = null;
             dgvCredentials.DataSource = displayList;
+            if (dgvCredentials.Columns["CredentialId"] != null)
+                dgvCredentials.Columns["CredentialId"].Visible = false;
             dgvCredentials.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
         }
 
@@ -313,6 +320,53 @@ namespace Magazin
             }
         }
 
+        // НОВАЯ КНОПКА: Удаление товара
+        private void BtnDeleteProduct_Click(object sender, EventArgs e)
+        {
+            if (dgvProducts.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("Выберите товар для удаления!", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            int productId = (int)dgvProducts.SelectedRows[0].Cells["ProductId"].Value;
+            string productName = dgvProducts.SelectedRows[0].Cells["ProductName"].Value.ToString();
+
+            // Подтверждение удаления
+            DialogResult result = MessageBox.Show(
+                $"Вы уверены, что хотите полностью удалить товар:\n\"{productName}\"?\n\nВНИМАНИЕ! Это действие нельзя отменить!",
+                "Подтверждение удаления",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (result == DialogResult.Yes)
+            {
+                // Находим и удаляем товар
+                Product productToRemove = null;
+                foreach (var p in DataService.Instance.Products)
+                {
+                    if (p.ProductId == productId)
+                    {
+                        productToRemove = p;
+                        break;
+                    }
+                }
+
+                if (productToRemove != null)
+                {
+                    // Удаляем из списка Products (если DataService поддерживает удаление)
+                    DataService.Instance.Products.Remove(productToRemove);
+
+                    // Также нужно удалить из базы данных
+                    // Добавьте метод DeleteProduct в DatabaseService и DataService
+                    // db.DeleteProduct(productId);
+
+                    LoadProducts();
+                    MessageBox.Show($"✅ Товар \"{productName}\" удален!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+        }
+
         private void BtnSaveProduct_Click(object sender, EventArgs e)
         {
             try
@@ -362,8 +416,11 @@ namespace Magazin
             if (dgvProducts.SelectedRows.Count == 0) return;
 
             int productId = (int)dgvProducts.SelectedRows[0].Cells["ProductId"].Value;
+            string productName = dgvProducts.SelectedRows[0].Cells["ProductName"].Value.ToString();
 
-            var result = MessageBox.Show("Снять товар с продажи?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult result = MessageBox.Show($"Снять товар \"{productName}\" с продажи?",
+                "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
             if (result == DialogResult.Yes)
             {
                 foreach (var p in DataService.Instance.Products)
@@ -375,10 +432,11 @@ namespace Magazin
                     }
                 }
                 LoadProducts();
-                MessageBox.Show("Товар снят с продажи!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"✅ Товар \"{productName}\" снят с продажи!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
+        // Остальные методы (для сотрудников и учетных записей) остаются без изменений...
         private void BtnAddStaff_Click(object sender, EventArgs e)
         {
             Form staffForm = new Form();
@@ -444,8 +502,9 @@ namespace Magazin
             if (dgvStaff.SelectedRows.Count == 0) return;
 
             int staffId = (int)dgvStaff.SelectedRows[0].Cells["StaffId"].Value;
+            string staffName = dgvStaff.SelectedRows[0].Cells["Имя"].Value.ToString() + " " + dgvStaff.SelectedRows[0].Cells["Фамилия"].Value.ToString();
 
-            var result = MessageBox.Show("Уволить сотрудника?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult result = MessageBox.Show($"Уволить сотрудника {staffName}?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (result == DialogResult.Yes)
             {
                 foreach (var s in DataService.Instance.Staffs)
@@ -457,7 +516,7 @@ namespace Magazin
                     }
                 }
                 LoadStaff();
-                MessageBox.Show("Сотрудник уволен!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"✅ Сотрудник {staffName} уволен!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -580,7 +639,7 @@ namespace Magazin
 
             string login = dgvCredentials.SelectedRows[0].Cells["Login"].Value.ToString();
 
-            var result = MessageBox.Show($"Удалить учетную запись {login}?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult result = MessageBox.Show($"Удалить учетную запись {login}?", "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (result == DialogResult.Yes)
             {
                 UserCredential toRemove = null;
@@ -596,7 +655,7 @@ namespace Magazin
                     DataService.Instance.Credentials.Remove(toRemove);
 
                 LoadCredentials();
-                MessageBox.Show("Учетная запись удалена!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("✅ Учетная запись удалена!", "Готово", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
     }

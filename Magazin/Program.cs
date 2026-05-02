@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MyLib.Services;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,6 +14,10 @@ namespace Magazin
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            // Инициализация базы данных
+            var db = DatabaseService.Instance;
+
             Application.Run(new LoginForm());
         }
     }
